@@ -1,127 +1,123 @@
-/**
- * App.tsx - Aplicativo de Consultas Médicas
- * Versão 3: Componentização
- *
- * Evolução:
- * Aula 1 (31/03) → MVP Simples
- * Aula 2 (07/04) → Integração TypeScript
- * Aula 3 (14/04) → Componentização ← VOCÊ ESTÁ AQUI
- */
-
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, FlatList, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
 // Importando a modelagem TypeScript
-import { Especialidade } from "./src/types/especialidade";
-import { Paciente } from "./src/types/paciente";
 import { Medico } from "./src/interfaces/medico";
-import { Consulta } from "./src/interfaces/consulta";
+import { Paciente } from "./src/types/paciente";
 
-// Importando o componente reutilizável
-import { ConsultaCard } from "./src/components";
+// Importando os serviços que consomem a API real
+import { listarMedicos } from "./src/services/medicoService";
+import { listarPacientes } from "./src/services/pacienteService";
 
 export default function App() {
-  // Dados base (simulando o que tínhamos no backend)
-  const cardiologia: Especialidade = {
-    id: 1,
-    nome: "Cardiologia",
-    descricao: "Cuidados com o coração",
-  };
+  const [medicos, setMedicos] = useState<Medico[]>([]);
+  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
-  const medico1: Medico = {
-    id: 1,
-    nome: "Dr. Roberto Silva",
-    crm: "CRM12345",
-    especialidade: cardiologia,
-    ativo: true,
-  };
+  useEffect(() => {
+    carregarDados();
+  }, []);
 
-  const paciente1: Paciente = {
-    id: 1,
-    nome: "Carlos Andrade",
-    cpf: "123.456.789-00",
-    email: "carlos@email.com",
-    telefone: "(11) 98765-4321",
-  };
+  async function carregarDados() {
+    try {
+      setCarregando(true);
+      setErro(null);
 
-  // Estado da consulta
-  const [consulta, setConsulta] = useState<Consulta>({
-    id: 1,
-    medico: medico1,
-    paciente: paciente1,
-    data: new Date(2026, 2, 10), // 10/03/2026
-    valor: 350,
-    status: "agendada",
-    observacoes: "Consulta de rotina",
-  });
+      const [listaMedicos, listaPacientes] = await Promise.all([
+        listarMedicos(),
+        listarPacientes(),
+      ]);
 
-  /**
-   * Funções para manipular a consulta
-   *
-   * Essas funções serão passadas como props para o componente.
-   * O componente não altera o estado diretamente - ele apenas
-   * "comunica" ao pai (App) que uma ação foi solicitada.
-   */
-  function confirmarConsulta() {
-    setConsulta({
-      ...consulta,
-      status: "confirmada",
-    });
-  }
-
-  function cancelarConsulta() {
-    setConsulta({
-      ...consulta,
-      status: "cancelada",
-    });
+      setMedicos(listaMedicos);
+      setPacientes(listaPacientes);
+    } catch (error) {
+      setErro(
+        "Não foi possível carregar os dados.\nVerifique se o backend está rodando em http://localhost:8080"
+      );
+    } finally {
+      setCarregando(false);
+    }
   }
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Cabeçalho */}
-        <View style={styles.header}>
-          <Text style={styles.titulo}>Sistema de Consultas</Text>
-          <Text style={styles.subtitulo}>Consulta #{consulta.id}</Text>
-        </View>
+      <FlatList
+        contentContainerStyle={styles.scrollContent}
+        data={[]}
+        renderItem={null}
+        ListHeaderComponent={
+          <>
+            {/* Cabeçalho */}
+            <View style={styles.header}>
+              <Text style={styles.titulo}>Sistema de Consultas</Text>
+              <Text style={styles.subtitulo}>Dados do Backend</Text>
+            </View>
 
-        {/*
-          Componente ConsultaCard
+            {/* Indicador de carregamento */}
+            {carregando && (
+              <ActivityIndicator size="large" color="#fff" style={{ marginTop: 40 }} />
+            )}
 
-          Veja como ficou mais simples!
-          Antes: ~100 linhas de JSX no App.tsx
-          Agora: 1 componente reutilizável
+            {/* Mensagem de erro */}
+            {erro && (
+              <View style={styles.erroContainer}>
+                <Text style={styles.erroTexto}>{erro}</Text>
+              </View>
+            )}
 
-          Props:
-          - consulta: objeto com todos os dados
-          - onConfirmar: função a ser chamada ao confirmar
-          - onCancelar: função a ser chamada ao cancelar
-        */}
-        <ConsultaCard
-          consulta={consulta}
-          onConfirmar={confirmarConsulta}
-          onCancelar={cancelarConsulta}
-        />
+            {/* Lista de Médicos */}
+            {!carregando && !erro && (
+              <>
+                <Text style={styles.secaoTitulo}>
+                  👨‍⚕️ Médicos ({medicos.length})
+                </Text>
+                {medicos.map((medico) => (
+                  <View key={medico.id} style={styles.card}>
+                    <Text style={styles.cardNome}>{medico.nome}</Text>
+                    <Text style={styles.cardInfo}>CRM: {medico.crm}</Text>
+                    <Text style={styles.cardInfo}>
+                      {medico.especialidade?.nome ?? " - "}
+                    </Text>
+                    <View
+                      style={[
+                        styles.badge,
+                        medico.ativo ? styles.badgeAtivo : styles.badgeInativo,
+                      ]}
+                    >
+                      <Text style={styles.badgeTexto}>
+                        {medico.ativo ? "Ativo" : "Inativo"}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
 
-      </ScrollView>
+                {/* Lista de Pacientes */}
+                <Text style={[styles.secaoTitulo, { marginTop: 24 }]}>
+                  👤 Pacientes ({pacientes.length})
+                </Text>
+                {pacientes.map((paciente) => (
+                  <View key={paciente.id} style={styles.card}>
+                    <Text style={styles.cardNome}>{paciente.nome}</Text>
+                    <Text style={styles.cardInfo}>CPF: {paciente.cpf}</Text>
+                    <Text style={styles.cardInfo}>{paciente.email}</Text>
+                    {paciente.telefone && (
+                      <Text style={styles.cardInfo}>Tel: {paciente.telefone}</Text>
+                    )}
+                  </View>
+                ))}
+              </>
+            )}
+          </>
+        }
+      />
     </View>
   );
 }
 
-/**
- * Estilos do App
- *
- * Note que removemos TODOS os estilos do card!
- * Eles agora estão encapsulados no componente ConsultaCard.
- *
- * App.tsx agora só tem estilos de layout geral:
- * - Container principal
- * - Cabeçalho
- * - Rodapé
- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -130,6 +126,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingTop: 60,
+    paddingBottom: 40,
   },
   header: {
     alignItems: "center",
@@ -146,17 +143,59 @@ const styles = StyleSheet.create({
     color: "#fff",
     opacity: 0.9,
   },
-  rodape: {
+  secaoTitulo: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 12,
+  },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  cardNome: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 4,
+  },
+  cardInfo: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 2,
+  },
+  badge: {
+    alignSelf: "flex-start",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginTop: 8,
+  },
+  badgeAtivo: {
+    backgroundColor: "#d4edda",
+  },
+  badgeInativo: {
+    backgroundColor: "#f8d7da",
+  },
+  badgeTexto: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  erroContainer: {
     marginTop: 24,
     padding: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "rgba(255, 80, 80, 0.2)",
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 80, 80, 0.5)",
   },
-  rodapeTexto: {
-    fontSize: 12,
+  erroTexto: {
+    fontSize: 14,
     color: "#fff",
     textAlign: "center",
-    lineHeight: 18,
-    marginBottom: 4,
+    lineHeight: 22,
   },
 });
