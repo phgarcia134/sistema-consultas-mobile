@@ -175,4 +175,3 @@ const styles = StyleSheet.create({
   botaoDesabilitado: { opacity: 0.6 },
   botaoTexto: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });
-
